@@ -52,77 +52,38 @@ class ClusterBoundPointFinder:
             [[p.coordinates[i] for i in range(self.coordinates_count)] for p in self.input_vectors]
         )
 
-        colors = ['red', 'blue', 'green', 'purple', 'orange', 'brown', 'pink', 'gray', 'olive', 'cyan']
+        self.border_points = []
+        for cluster_index in range(self.n_clusters):
+            cluster_points = [
+                point for i, point in enumerate(self.input_vectors) if kmeans_clusters[i] == cluster_index
+            ]
+            center = Point(kmeans.cluster_centers_[cluster_index].tolist())
 
-        for i in np.arange(self.deviation, 1, 0.05):
-            if self.coordinates_count == 2:
-                fig, ax = plt.subplots()
-            else:
-                fig = plt.figure()
-                ax = fig.add_subplot(111, projection='3d')
-
-            if self.coordinates_count == 2:
-                ax.scatter([p.coordinates[0] for p in self.input_vectors],
-                           [p.coordinates[1] for p in self.input_vectors],
-                           s=100, label="All points", c='grey')
-            else:
-                ax.scatter([p.coordinates[0] for p in self.input_vectors],
-                           [p.coordinates[1] for p in self.input_vectors],
-                           [p.coordinates[2] for p in self.input_vectors],
-                           s=100, label="All points", c='grey')
-
-            print(f"Deviation: {i:.2f}")
-
-            for cluster_index in range(self.n_clusters):
-                cluster_points = [
-                    point for i, point in enumerate(self.input_vectors) if kmeans_clusters[i] == cluster_index
-                ]
-                center = Point(kmeans.cluster_centers_[cluster_index].tolist())
-
-                distances = {
-                    point: {
-                        inner_point: calc_distance(point, inner_point)
-                        for inner_point in cluster_points
-                        if inner_point != point
-                    }
-                    for point in cluster_points
+            distances = {
+                point: {
+                    inner_point: calc_distance(point, inner_point)
+                    for inner_point in cluster_points
+                    if inner_point != point
                 }
-                closest_distances = {
-                    point: dict(sorted(distances[point].items(), key=lambda item: item[1])[: self.core_point_count])
-                    for point in distances
-                }
-                mean_distances = {point: np.mean(list(dist.values())) for point, dist in closest_distances.items()}
-                point_centres = {
-                    point: calculate_centre(set(closest.keys()), point, self.coordinates_count)
-                    for point, closest in closest_distances.items()
-                }
-                point_offsets = {
-                    point: calculate_point_offset(point, center, mean_distances[point])
-                    for point, centre in point_centres.items()
-                }
+                for point in cluster_points
+            }
+            closest_distances = {
+                point: dict(sorted(distances[point].items(), key=lambda item: item[1])[: self.core_point_count])
+                for point in distances
+            }
+            mean_distances = {point: np.mean(list(dist.values())) for point, dist in closest_distances.items()}
+            point_centres = {
+                point: calculate_centre(set(closest.keys()), point, self.coordinates_count)
+                for point, closest in closest_distances.items()
+            }
+            point_offsets = {
+                point: calculate_point_offset(point, center, mean_distances[point])
+                for point, centre in point_centres.items()
+            }
 
-                result = {point: offset for point, offset in point_offsets.items() if offset > i}
-                print(f"  Cluster {cluster_index}: {len(result)} border points")
-
-                if self.coordinates_count == 2:
-                    ax.scatter([p.coordinates[0] for p in result],
-                               [p.coordinates[1] for p in result],
-                               s=100, c=colors[cluster_index])
-                    ax.scatter(center.coordinates[0], center.coordinates[1], s=150, c='black', marker='X')
-                else:
-                    ax.scatter([p.coordinates[0] for p in result],
-                               [p.coordinates[1] for p in result],
-                               [p.coordinates[2] for p in result],
-                               s=100, c=colors[cluster_index])
-                    ax.scatter(center.coordinates[0], center.coordinates[1], center.coordinates[2], s=150,
-                               c='black', marker='X')
-
-            ax.set_xlabel("X")
-            ax.set_ylabel("Y")
-            if self.coordinates_count == 3:
-                ax.set_zlabel("Z")
-            plt.grid(True)
-            plt.show()
+            result = {point: offset for point, offset in point_offsets.items() if offset > self.deviation}
+            self.border_points.append(result)
+            print(f"  Cluster {cluster_index}: {len(result)} border points")
 
     def find_cluster_centers(self) -> Tuple[int, List[Point]]:
         """
@@ -142,116 +103,10 @@ class ClusterBoundPointFinder:
         # Повторно запускаємо KMeans з оптимальною кількістю кластерів
         n_clusters = 2
         kmeans = KMeans(n_clusters=n_clusters)
-        kmeans.fit([[point.coordinates[0], point.coordinates[1]] for point in self.input_vectors])
+        kmeans.fit(
+            [[p.coordinates[i] for i in range(self.coordinates_count)] for p in self.input_vectors])  # Виправлено
         cluster_centers = [Point(center.tolist()) for center in kmeans.cluster_centers_]
         return n_clusters, cluster_centers
-
-
-class PlotWindow(QWidget):
-    def __init__(self, parent=None, points=None, cluster_centers=None, kmeans_clusters=None, coordinates_count=2,
-                 deviation=0.15):
-        super().__init__(parent)
-        self.points = points
-        self.cluster_centers = cluster_centers
-        self.kmeans_clusters = kmeans_clusters
-        self.coordinates_count = coordinates_count
-        self.deviation = deviation
-        self.initUI()
-
-    def initUI(self):
-        self.setWindowTitle("Графік кластеризації")
-
-        self.figure = plt.figure()
-        self.canvas = FigureCanvas(self.figure)
-
-        if self.coordinates_count == 2:
-            self.ax = self.figure.add_subplot(111)
-        else:
-            self.ax = self.figure.add_subplot(111, projection='3d')
-
-        self.draw_plot()
-
-        self.slider = QSlider(Qt.Horizontal)
-        self.slider.setMinimum(15)
-        self.slider.setMaximum(100)
-        self.slider.setValue(int(self.deviation * 100))
-        self.slider.valueChanged.connect(self.on_slider_change)
-
-        hbox = QHBoxLayout()
-        hbox.addWidget(self.canvas)
-        hbox.addWidget(self.slider)
-
-        self.setLayout(hbox)
-
-    def on_slider_change(self):
-        self.deviation = self.slider.value() / 100
-        self.draw_plot()
-
-    def draw_plot(self):
-        self.ax.cla()  # Очищення графіка
-
-        colors = ['red', 'blue', 'green', 'purple', 'orange', 'brown', 'pink', 'gray', 'olive', 'cyan']
-
-        if self.coordinates_count == 2:
-            self.ax.scatter([p.coordinates[0] for p in self.points],
-                            [p.coordinates[1] for p in self.points],
-                            s=100, label="All points", c='grey')
-        else:
-            self.ax.scatter([p.coordinates[0] for p in self.points],
-                            [p.coordinates[1] for p in self.points],
-                            [p.coordinates[2] for p in self.points],
-                            s=100, label="All points", c='grey')
-
-        for cluster_index in range(len(self.cluster_centers)):
-            cluster_points = [
-                point for i, point in enumerate(self.points) if self.kmeans_clusters[i] == cluster_index
-            ]
-            center = self.cluster_centers[cluster_index]
-
-            distances = {
-                point: {
-                    inner_point: calc_distance(point, inner_point)
-                    for inner_point in cluster_points
-                    if inner_point != point
-                }
-                for point in cluster_points
-            }
-            closest_distances = {
-                point: dict(sorted(distances[point].items(), key=lambda item: item[1])[:5])
-                for point in distances
-            }
-            mean_distances = {point: np.mean(list(dist.values())) for point, dist in closest_distances.items()}
-            point_centres = {
-                point: calculate_centre(set(closest.keys()), point, self.coordinates_count)
-                for point, closest in closest_distances.items()
-            }
-            point_offsets = {
-                point: calculate_point_offset(point, center, mean_distances[point])
-                for point, centre in point_centres.items()
-            }
-
-            result = {point: offset for point, offset in point_offsets.items() if offset > self.deviation}
-            print(f"  Cluster {cluster_index}: {len(result)} border points")
-
-            if self.coordinates_count == 2:
-                self.ax.scatter([p.coordinates[0] for p in result],
-                                [p.coordinates[1] for p in result],
-                                s=100, c=colors[cluster_index])
-                self.ax.scatter(center.coordinates[0], center.coordinates[1], s=150, c='black', marker='X')
-            else:
-                self.ax.scatter([p.coordinates[0] for p in result],
-                                [p.coordinates[1] for p in result],
-                                [p.coordinates[2] for p in result],
-                                s=100, c=colors[cluster_index])
-                self.ax.scatter(center.coordinates[0], center.coordinates[1], center.coordinates[2], s=150,
-                                c='black', marker='X')
-
-        self.ax.set_xlabel("X")
-        self.ax.set_ylabel("Y")
-        if self.coordinates_count == 3:
-            self.ax.set_zlabel("Z")
-        plt.grid(True)
-        self.canvas.draw()
 
 
 class MainWindow(QWidget):
@@ -263,6 +118,7 @@ class MainWindow(QWidget):
         self.setWindowTitle("Пошук граничних точок кластерів")
         self.dimension = 2  # За замовчуванням вибрано 2D
         self.input_vectors = []
+        self.deviation = 0.15
 
         # Віджети для вибору розмірності
         self.dimension_label = QLabel("Оберіть розмірність простору ознак:")
@@ -301,11 +157,43 @@ class MainWindow(QWidget):
         self.add_button.clicked.connect(self.on_add_data_click)
         grid.addWidget(self.add_button, 3, 1)  # Додаємо кнопку "Додати"
 
+        # Графік
+        self.figure = plt.figure()
+        self.canvas = FigureCanvas(self.figure)
+        self.ax = self.figure.add_subplot(111)  # Початково 2D графік
+
+        # Повзунок
+        self.slider = QSlider(Qt.Horizontal)
+        self.slider.setMinimum(15)
+        self.slider.setMaximum(100)
+        self.slider.setValue(int(self.deviation * 100))
+        self.slider.valueChanged.connect(self.on_slider_change)
+
+        # Мітка для значення deviation
+        self.deviation_label = QLabel(f"Deviation: {self.deviation:.2f}", self)
+
+        # Розміщення віджетів
+        hbox = QHBoxLayout()
+        hbox.addWidget(self.canvas)
+        vbox = QVBoxLayout()
+        vbox.addWidget(self.slider)
+        vbox.addWidget(self.deviation_label)
+        hbox.addLayout(vbox)
+        grid.addLayout(hbox, 6, 0, 1, 3)  # Додаємо графік та повзунок
+
     def on_dimension_select(self):
         self.dimension = int(self.dimension_combobox.currentText())
         print(f"Обрана розмірність: {self.dimension}")
-        self.data_table.setColumnCount(self.dimension)  # Оновлюємо кількість стовпців таблиці
+        self.data_table.setColumnCount(self.dimension)
         self.data_table.setHorizontalHeaderLabels([f"X{i + 1}" for i in range(self.dimension)])
+
+        # Оновлення графіка (видалення старого та створення нового)
+        self.figure.clear()
+        if self.dimension == 2:
+            self.ax = self.figure.add_subplot(111)
+        else:
+            self.ax = self.figure.add_subplot(111, projection='3d')
+        self.canvas.draw()
 
     def on_file_select(self):
         options = QFileDialog.Options()
@@ -333,7 +221,7 @@ class MainWindow(QWidget):
                 self.data_table.setItem(i, j, item)
 
     def on_calculate_click(self):
-        cluster_bound_point_finder = ClusterBoundPointFinder(self.input_vectors, 0.15)
+        cluster_bound_point_finder = ClusterBoundPointFinder(self.input_vectors, self.deviation)
         cluster_bound_point_finder.calculate_bound_points()
 
         kmeans = KMeans(n_clusters=cluster_bound_point_finder.n_clusters)
@@ -341,13 +229,12 @@ class MainWindow(QWidget):
             [[p.coordinates[i] for i in range(cluster_bound_point_finder.coordinates_count)] for p in
              cluster_bound_point_finder.input_vectors])
 
-        self.plot_window = PlotWindow(
-            points=cluster_bound_point_finder.input_vectors,
-            cluster_centers=cluster_bound_point_finder.cluster_centers,
-            kmeans_clusters=kmeans_clusters,
-            coordinates_count=cluster_bound_point_finder.coordinates_count
-        )
-        self.plot_window.show()
+        self.draw_plot(cluster_bound_point_finder, kmeans_clusters)
+
+    def on_slider_change(self):
+        self.deviation = self.slider.value() / 100
+        self.deviation_label.setText(f"Deviation: {self.deviation:.2f}")
+        self.on_calculate_click()  # Перерахунок та оновлення графіка
 
     def on_add_data_click(self):
         text = self.input_edit.text()
@@ -365,6 +252,45 @@ class MainWindow(QWidget):
             self.input_edit.clear()
         except ValueError:
             print("Некоректний формат введення. Введіть числа, розділені пробілами та комами для розділення точок.")
+
+    def draw_plot(self, cluster_bound_point_finder, kmeans_clusters):
+        self.ax.cla()  # Очищення графіка
+
+        colors = ['red', 'blue', 'green', 'purple', 'orange', 'brown', 'pink', 'gray', 'olive', 'cyan']
+
+        if cluster_bound_point_finder.coordinates_count == 2:
+            self.ax.scatter([p.coordinates[0] for p in cluster_bound_point_finder.input_vectors],
+                            [p.coordinates[1] for p in cluster_bound_point_finder.input_vectors],
+                            s=100, label="All points", c='grey')
+        else:
+            self.ax.scatter([p.coordinates[0] for p in cluster_bound_point_finder.input_vectors],
+                            [p.coordinates[1] for p in cluster_bound_point_finder.input_vectors],
+                            [p.coordinates[2] for p in cluster_bound_point_finder.input_vectors],
+                            s=100, label="All points", c='grey')
+
+        for cluster_index in range(len(cluster_bound_point_finder.cluster_centers)):
+            center = cluster_bound_point_finder.cluster_centers[cluster_index]
+            result = cluster_bound_point_finder.border_points[cluster_index]  # Отримуємо граничні точки з результату
+
+            if cluster_bound_point_finder.coordinates_count == 2:
+                self.ax.scatter([p.coordinates[0] for p in result],
+                                [p.coordinates[1] for p in result],
+                                s=100, c=colors[cluster_index])
+                self.ax.scatter(center.coordinates[0], center.coordinates[1], s=150, c='black', marker='X')
+            else:
+                self.ax.scatter([p.coordinates[0] for p in result],
+                                [p.coordinates[1] for p in result],
+                                [p.coordinates[2] for p in result],
+                                s=100, c=colors[cluster_index])
+                self.ax.scatter(center.coordinates[0], center.coordinates[1], center.coordinates[2], s=150,
+                                c='black', marker='X')
+
+        self.ax.set_xlabel("X")
+        self.ax.set_ylabel("Y")
+        if cluster_bound_point_finder.coordinates_count == 3:
+            self.ax.set_zlabel("Z")
+        plt.grid(True)
+        self.canvas.draw()
 
 
 if __name__ == "__main__":
