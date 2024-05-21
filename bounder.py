@@ -1,5 +1,8 @@
 import sys
-from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QComboBox, QPushButton, QVBoxLayout
+from PyQt5.QtWidgets import (
+    QApplication, QWidget, QLabel, QComboBox, QPushButton, QVBoxLayout,
+    QLineEdit, QFileDialog, QGridLayout, QTableWidget, QTableWidgetItem
+)
 from typing import List, Set, Tuple
 import numpy as np
 import matplotlib.pyplot as plt
@@ -44,7 +47,8 @@ class ClusterBoundPointFinder:
     def calculate_bound_points(self):
         kmeans = KMeans(n_clusters=self.n_clusters)
         kmeans_clusters = kmeans.fit_predict(
-            [[p.coordinates[i] for i in range(self.coordinates_count)] for p in self.input_vectors])
+            [[p.coordinates[i] for i in range(self.coordinates_count)] for p in self.input_vectors]
+        )
 
         colors = ['red', 'blue', 'green', 'purple', 'orange', 'brown', 'pink', 'gray', 'olive', 'cyan']
 
@@ -68,20 +72,32 @@ class ClusterBoundPointFinder:
             print(f"Deviation: {i:.2f}")
 
             for cluster_index in range(self.n_clusters):
-                cluster_points = [point for i, point in enumerate(self.input_vectors) if
-                                  kmeans_clusters[i] == cluster_index]
+                cluster_points = [
+                    point for i, point in enumerate(self.input_vectors) if kmeans_clusters[i] == cluster_index
+                ]
                 center = Point(kmeans.cluster_centers_[cluster_index].tolist())
 
-                distances = {point: {inner_point: calc_distance(point, inner_point) for inner_point in cluster_points if
-                                     inner_point != point} for point in cluster_points}
+                distances = {
+                    point: {
+                        inner_point: calc_distance(point, inner_point)
+                        for inner_point in cluster_points
+                        if inner_point != point
+                    }
+                    for point in cluster_points
+                }
                 closest_distances = {
-                    point: dict(sorted(distances[point].items(), key=lambda item: item[1])[:self.core_point_count]) for
-                    point in distances}
+                    point: dict(sorted(distances[point].items(), key=lambda item: item[1])[: self.core_point_count])
+                    for point in distances
+                }
                 mean_distances = {point: np.mean(list(dist.values())) for point, dist in closest_distances.items()}
-                point_centres = {point: calculate_centre(set(closest.keys()), point, self.coordinates_count) for
-                                 point, closest in closest_distances.items()}
-                point_offsets = {point: calculate_point_offset(point, centre, mean_distances[point]) for point, centre
-                                 in point_centres.items()}
+                point_centres = {
+                    point: calculate_centre(set(closest.keys()), point, self.coordinates_count)
+                    for point, closest in closest_distances.items()
+                }
+                point_offsets = {
+                    point: calculate_point_offset(point, center, mean_distances[point])
+                    for point, centre in point_centres.items()
+                }
 
                 result = {point: offset for point, offset in point_offsets.items() if offset > i}
                 print(f"  Cluster {cluster_index}: {len(result)} border points")
@@ -96,8 +112,8 @@ class ClusterBoundPointFinder:
                                [p.coordinates[1] for p in result],
                                [p.coordinates[2] for p in result],
                                s=100, c=colors[cluster_index])
-                    ax.scatter(center.coordinates[0], center.coordinates[1], center.coordinates[2], s=150, c='black',
-                               marker='X')
+                    ax.scatter(center.coordinates[0], center.coordinates[1], center.coordinates[2], s=150,
+                               c='black', marker='X')
 
             ax.set_xlabel("X")
             ax.set_ylabel("Y")
@@ -122,6 +138,7 @@ class ClusterBoundPointFinder:
         n_clusters = np.argmax(np.diff(wcss)) + 2
 
         # Повторно запускаємо KMeans з оптимальною кількістю кластерів
+        # n_clusters = 2
         kmeans = KMeans(n_clusters=n_clusters)
         kmeans.fit([[point.coordinates[0], point.coordinates[1]] for point in self.input_vectors])
         cluster_centers = [Point(center.tolist()) for center in kmeans.cluster_centers_]
@@ -136,22 +153,77 @@ class MainWindow(QWidget):
     def initUI(self):
         self.setWindowTitle("Пошук граничних точок кластерів")
         self.dimension = 2  # За замовчуванням вибрано 2D
+        self.input_vectors = []
 
+        # Віджети для вибору розмірності
         self.dimension_label = QLabel("Оберіть розмірність простору ознак:")
         self.dimension_combobox = QComboBox(self)
         self.dimension_combobox.addItems(["2", "3"])
         self.dimension_button = QPushButton("Обрати", self)
         self.dimension_button.clicked.connect(self.on_dimension_select)
 
-        vbox = QVBoxLayout()
-        vbox.addWidget(self.dimension_label)
-        vbox.addWidget(self.dimension_combobox)
-        vbox.addWidget(self.dimension_button)
-        self.setLayout(vbox)
+        # Віджети для введення даних
+        self.input_label = QLabel("Введіть точки:")
+        self.input_edit = QLineEdit(self)
+        self.file_button = QPushButton("Обрати файл", self)
+        self.file_button.clicked.connect(self.on_file_select)
+
+        # Таблиця для відображення даних
+        self.data_table = QTableWidget(self)
+        self.data_table.setColumnCount(self.dimension)
+        self.data_table.setHorizontalHeaderLabels([f"X{i + 1}" for i in range(self.dimension)])
+
+        # Розміщення віджетів
+        grid = QGridLayout()
+        grid.addWidget(self.dimension_label, 0, 0)
+        grid.addWidget(self.dimension_combobox, 0, 1)
+        grid.addWidget(self.dimension_button, 0, 2)
+        grid.addWidget(self.input_label, 1, 0)
+        grid.addWidget(self.input_edit, 2, 0, 1, 3)
+        grid.addWidget(self.file_button, 3, 0)
+        grid.addWidget(self.data_table, 4, 0, 1, 3)  # Додаємо таблицю
+        self.setLayout(grid)
+
+        self.calculate_button = QPushButton("Розрахувати", self)
+        self.calculate_button.clicked.connect(self.on_calculate_click)
+        grid.addWidget(self.calculate_button, 5, 0)  # Додаємо кнопку
 
     def on_dimension_select(self):
         self.dimension = int(self.dimension_combobox.currentText())
         print(f"Обрана розмірність: {self.dimension}")
+        self.data_table.setColumnCount(self.dimension)  # Оновлюємо кількість стовпців таблиці
+        self.data_table.setHorizontalHeaderLabels([f"X{i + 1}" for i in range(self.dimension)])
+
+    def on_file_select(self):
+        options = QFileDialog.Options()
+        file_name, _ = QFileDialog.getOpenFileName(self, "Обрати файл", "", "Текстові файли (*.txt);;Всі файли (*)",
+                                                   options=options)
+        if file_name:
+            self.load_data_from_file(file_name)
+
+    def load_data_from_file(self, file_name):
+        self.input_vectors = []
+        with open(file_name, 'r') as f:
+            for line in f:
+                coordinates = [float(x) for x in line.split()]
+                if len(coordinates) == self.dimension:
+                    self.input_vectors.append(Point(coordinates))
+        print(f"Дані завантажено з файлу: {file_name}")
+        print(f"Кількість точок: {len(self.input_vectors)}")
+        self.update_data_table()  # Оновлюємо таблицю після завантаження даних
+
+    def update_data_table(self):
+        self.data_table.setRowCount(len(self.input_vectors))
+        for i, point in enumerate(self.input_vectors):
+            for j, coord in enumerate(point.coordinates):
+                item = QTableWidgetItem(str(coord))
+                self.data_table.setItem(i, j, item)
+
+    def on_calculate_click(self):
+        deviation = 0.15  # Задайте бажане значення deviation
+        cluster_bound_point_finder = ClusterBoundPointFinder(self.input_vectors, deviation)
+        cluster_bound_point_finder.calculate_bound_points()
+
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
