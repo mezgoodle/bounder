@@ -1,9 +1,11 @@
+import sys
+from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QComboBox, QPushButton, QVBoxLayout
 from typing import List, Set, Tuple
 import numpy as np
 import matplotlib.pyplot as plt
 import random
 from sklearn.cluster import KMeans
-from mpl_toolkits.mplot3d import Axes3D  # Імпорт для 3D графіків
+from mpl_toolkits.mplot3d import Axes3D
 
 
 class Point:
@@ -126,10 +128,33 @@ class ClusterBoundPointFinder:
         return n_clusters, cluster_centers
 
 
-if __name__ == '__main__':
-    # Генерація 100 випадкових точок (2D або 3D)
-    dimension = 3  # Оберіть 2 для 2D або 3 для 3D
-    input_vectors = [Point([random.uniform(0, 10) for _ in range(dimension)]) for _ in range(100)]
+class MainWindow(QWidget):
+    def __init__(self):
+        super().__init__()
+        self.initUI()
 
-    cluster_bound_point_finder = ClusterBoundPointFinder(input_vectors, 0.15)
-    cluster_bound_point_finder.calculate_bound_points()
+    def initUI(self):
+        self.setWindowTitle("Пошук граничних точок кластерів")
+        self.dimension = 2  # За замовчуванням вибрано 2D
+
+        self.dimension_label = QLabel("Оберіть розмірність простору ознак:")
+        self.dimension_combobox = QComboBox(self)
+        self.dimension_combobox.addItems(["2", "3"])
+        self.dimension_button = QPushButton("Обрати", self)
+        self.dimension_button.clicked.connect(self.on_dimension_select)
+
+        vbox = QVBoxLayout()
+        vbox.addWidget(self.dimension_label)
+        vbox.addWidget(self.dimension_combobox)
+        vbox.addWidget(self.dimension_button)
+        self.setLayout(vbox)
+
+    def on_dimension_select(self):
+        self.dimension = int(self.dimension_combobox.currentText())
+        print(f"Обрана розмірність: {self.dimension}")
+
+if __name__ == "__main__":
+    app = QApplication(sys.argv)
+    window = MainWindow()
+    window.show()
+    sys.exit(app.exec_())
