@@ -1,3 +1,4 @@
+import random
 import sys
 from PyQt5.QtWidgets import (
     QApplication, QWidget, QLabel, QComboBox, QPushButton, QVBoxLayout,
@@ -45,19 +46,21 @@ class ClusterBoundPointFinder:
         self.coordinates_count = len(input_vectors[0].coordinates) if input_vectors else 0
         self.core_point_count = 5
         self.n_clusters, self.cluster_centers = self.find_cluster_centers()
+        self.kmeans_clusters = None  # Додано для зберігання результату KMeans
 
     def calculate_bound_points(self):
-        kmeans = KMeans(n_clusters=self.n_clusters)
-        kmeans_clusters = kmeans.fit_predict(
-            [[p.coordinates[i] for i in range(self.coordinates_count)] for p in self.input_vectors]
-        )
+        if self.kmeans_clusters is None:
+            self.kmeans = KMeans(n_clusters=self.n_clusters)  # Зберігаємо kmeans як атрибут класу
+            self.kmeans_clusters = self.kmeans.fit_predict(
+                [[p.coordinates[i] for i in range(self.coordinates_count)] for p in self.input_vectors]
+            )
 
         self.border_points = []
         for cluster_index in range(self.n_clusters):
             cluster_points = [
-                point for i, point in enumerate(self.input_vectors) if kmeans_clusters[i] == cluster_index
+                point for i, point in enumerate(self.input_vectors) if self.kmeans_clusters[i] == cluster_index
             ]
-            center = Point(kmeans.cluster_centers_[cluster_index].tolist())
+            center = Point(self.kmeans.cluster_centers_[cluster_index].tolist())  # Використовуємо self.kmeans
 
             distances = {
                 point: {
@@ -90,21 +93,20 @@ class ClusterBoundPointFinder:
         Знаходить центри кластерів за допомогою KMeans
         та визначає оптимальну кількість кластерів за методом "ліктя".
         """
-        # wcss = []
-        # for i in range(1, self.max_clusters + 1):
-        #     kmeans = KMeans(n_clusters=i)
-        #     kmeans.fit([[point.coordinates[0], point.coordinates[1]] for point in self.input_vectors])
-        #     wcss.append(kmeans.inertia_)
-        #
-        # # Знаходимо оптимальну кількість кластерів
-        # # Використовуємо спрощений метод "ліктя"
-        # n_clusters = np.argmax(np.diff(wcss)) + 2
+        wcss = []
+        for i in range(1, self.max_clusters + 1):
+            kmeans = KMeans(n_clusters=i)
+            kmeans.fit([[point.coordinates[0], point.coordinates[1]] for point in self.input_vectors])
+            wcss.append(kmeans.inertia_)
+
+        # Знаходимо оптимальну кількість кластерів
+        # Використовуємо спрощений метод "ліктя"
+        n_clusters = np.argmax(np.diff(wcss)) + 2
 
         # Повторно запускаємо KMeans з оптимальною кількістю кластерів
-        n_clusters = 2
+        # n_clusters = 2
         kmeans = KMeans(n_clusters=n_clusters)
-        kmeans.fit(
-            [[p.coordinates[i] for i in range(self.coordinates_count)] for p in self.input_vectors])  # Виправлено
+        kmeans.fit([[p.coordinates[i] for i in range(self.coordinates_count)] for p in self.input_vectors])
         cluster_centers = [Point(center.tolist()) for center in kmeans.cluster_centers_]
         return n_clusters, cluster_centers
 
@@ -221,39 +223,45 @@ class MainWindow(QWidget):
                 self.data_table.setItem(i, j, item)
 
     def on_calculate_click(self):
-        cluster_bound_point_finder = ClusterBoundPointFinder(self.input_vectors, self.deviation)
-        cluster_bound_point_finder.calculate_bound_points()
+        self.cluster_bound_point_finder = ClusterBoundPointFinder(self.input_vectors,
+                                                                  self.deviation)  # Зберігаємо cluster_bound_point_finder
+        self.cluster_bound_point_finder.calculate_bound_points()
 
-        kmeans = KMeans(n_clusters=cluster_bound_point_finder.n_clusters)
-        kmeans_clusters = kmeans.fit_predict(
-            [[p.coordinates[i] for i in range(cluster_bound_point_finder.coordinates_count)] for p in
-             cluster_bound_point_finder.input_vectors])
-
-        self.draw_plot(cluster_bound_point_finder, kmeans_clusters)
+        self.draw_plot(self.cluster_bound_point_finder)  # Видаляємо kmeans_clusters з аргументів
 
     def on_slider_change(self):
         self.deviation = self.slider.value() / 100
         self.deviation_label.setText(f"Deviation: {self.deviation:.2f}")
-        self.on_calculate_click()  # Перерахунок та оновлення графіка
+
+        # Оновлюємо deviation в cluster_bound_point_finder
+        self.cluster_bound_point_finder.deviation = self.deviation
+        # Перераховуємо граничні точки
+        self.cluster_bound_point_finder.calculate_bound_points()
+
+        self.draw_plot(self.cluster_bound_point_finder)  # Перемальовуємо графік
 
     def on_add_data_click(self):
-        text = self.input_edit.text()
-        try:
-            point_strings = text.split(',')  # Розділяємо рядок на точки за допомогою коми
-            for point_str in point_strings:
-                coordinates = [float(x) for x in point_str.split()]  # Розділяємо координати пробілами
-                if len(coordinates) == self.dimension:
-                    self.input_vectors.append(Point(coordinates))
-                else:
-                    print(
-                        f"Невірна кількість координат у точці '{point_str}'. Введіть {self.dimension} координати, розділені пробілами."
-                    )
-            self.update_data_table()
-            self.input_edit.clear()
-        except ValueError:
-            print("Некоректний формат введення. Введіть числа, розділені пробілами та комами для розділення точок.")
+        self.input_vectors = [
+            Point([random.uniform(0, 10) for _ in range(self.dimension)]) for _ in range(100)
+        ]
+        self.update_data_table()
+        # text = self.input_edit.text()
+        # try:
+        #     point_strings = text.split(',')  # Розділяємо рядок на точки за допомогою коми
+        #     for point_str in point_strings:
+        #         coordinates = [float(x) for x in point_str.split()]  # Розділяємо координати пробілами
+        #         if len(coordinates) == self.dimension:
+        #             self.input_vectors.append(Point(coordinates))
+        #         else:
+        #             print(
+        #                 f"Невірна кількість координат у точці '{point_str}'. Введіть {self.dimension} координати, розділені пробілами."
+        #             )
+        #     self.update_data_table()
+        #     self.input_edit.clear()
+        # except ValueError:
+        #     print("Некоректний формат введення. Введіть числа, розділені пробілами та комами для розділення точок.")
 
-    def draw_plot(self, cluster_bound_point_finder, kmeans_clusters):
+    def draw_plot(self, cluster_bound_point_finder):
         self.ax.cla()  # Очищення графіка
 
         colors = ['red', 'blue', 'green', 'purple', 'orange', 'brown', 'pink', 'gray', 'olive', 'cyan']
@@ -270,13 +278,14 @@ class MainWindow(QWidget):
 
         for cluster_index in range(len(cluster_bound_point_finder.cluster_centers)):
             center = cluster_bound_point_finder.cluster_centers[cluster_index]
-            result = cluster_bound_point_finder.border_points[cluster_index]  # Отримуємо граничні точки з результату
+            result = cluster_bound_point_finder.border_points[cluster_index]  # Беремо вже обчислені граничні точки
 
             if cluster_bound_point_finder.coordinates_count == 2:
                 self.ax.scatter([p.coordinates[0] for p in result],
                                 [p.coordinates[1] for p in result],
                                 s=100, c=colors[cluster_index])
                 self.ax.scatter(center.coordinates[0], center.coordinates[1], s=150, c='black', marker='X')
+                self.ax.text(center.coordinates[0], center.coordinates[1], str(cluster_index), fontsize=12)
             else:
                 self.ax.scatter([p.coordinates[0] for p in result],
                                 [p.coordinates[1] for p in result],
@@ -284,6 +293,8 @@ class MainWindow(QWidget):
                                 s=100, c=colors[cluster_index])
                 self.ax.scatter(center.coordinates[0], center.coordinates[1], center.coordinates[2], s=150,
                                 c='black', marker='X')
+                self.ax.text(center.coordinates[0], center.coordinates[1], center.coordinates[2], str(cluster_index),
+                             fontsize=12)
 
         self.ax.set_xlabel("X")
         self.ax.set_ylabel("Y")
