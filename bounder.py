@@ -150,10 +150,10 @@ class MainWindow(QWidget):
 
         # Мітки для таблиць
         self.data_table_label = QLabel("Список точок:", self)
-        self.border_points_table_label = QLabel("Список border точок:", self)
+        self.border_points_table_label = QLabel("Список граничних точок:", self)
 
         # Кнопка "Додати"
-        self.add_button = QPushButton("Додати", self)
+        self.add_button = QPushButton("Додати точки", self)
         self.add_button.clicked.connect(self.on_add_data_click)
 
         # Кнопка "Розрахувати"
