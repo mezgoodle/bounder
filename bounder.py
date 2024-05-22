@@ -50,17 +50,20 @@ class ClusterBoundPointFinder:
 
     def calculate_bound_points(self):
         if self.kmeans_clusters is None:
-            self.kmeans = KMeans(n_clusters=self.n_clusters)  # Зберігаємо kmeans як атрибут класу
+            self.kmeans = KMeans(n_clusters=self.n_clusters)
             self.kmeans_clusters = self.kmeans.fit_predict(
                 [[p.coordinates[i] for i in range(self.coordinates_count)] for p in self.input_vectors]
             )
+
+            # Оновлюємо центри кластерів з KMeans
+            self.cluster_centers = [Point(center.tolist()) for center in self.kmeans.cluster_centers_]
 
         self.border_points = []
         for cluster_index in range(self.n_clusters):
             cluster_points = [
                 point for i, point in enumerate(self.input_vectors) if self.kmeans_clusters[i] == cluster_index
             ]
-            center = Point(self.kmeans.cluster_centers_[cluster_index].tolist())  # Використовуємо self.kmeans
+            center = self.cluster_centers[cluster_index]  # Використовуємо оновлені центри
 
             distances = {
                 point: {
@@ -237,7 +240,12 @@ class MainWindow(QWidget):
                                                                   self.deviation)  # Зберігаємо cluster_bound_point_finder
         self.cluster_bound_point_finder.calculate_bound_points()
 
-        self.draw_plot(self.cluster_bound_point_finder)  # Видаляємо kmeans_clusters з аргументів
+        self.cluster_colors = {}
+        colors = ['red', 'blue', 'green', 'purple', 'orange', 'brown', 'pink', 'gray', 'olive', 'cyan']
+        for cluster_index in range(self.cluster_bound_point_finder.n_clusters):
+            self.cluster_colors[cluster_index] = colors[cluster_index]
+
+        self.draw_plot(self.cluster_bound_point_finder)
 
     def on_slider_change(self):
         self.deviation = self.slider.value() / 100
@@ -276,8 +284,6 @@ class MainWindow(QWidget):
     def draw_plot(self, cluster_bound_point_finder):
         self.ax.cla()  # Очищення графіка
 
-        colors = ['red', 'blue', 'green', 'purple', 'orange', 'brown', 'pink', 'gray', 'olive', 'cyan']
-
         if cluster_bound_point_finder.coordinates_count == 2:
             self.ax.scatter([p.coordinates[0] for p in cluster_bound_point_finder.input_vectors],
                             [p.coordinates[1] for p in cluster_bound_point_finder.input_vectors],
@@ -292,23 +298,23 @@ class MainWindow(QWidget):
         for cluster_index in range(len(cluster_bound_point_finder.cluster_centers)):
             center = cluster_bound_point_finder.cluster_centers[cluster_index]
             result = cluster_bound_point_finder.border_points[cluster_index]  # Беремо вже обчислені граничні точки
-            info_string += f"Кластер {cluster_index}: {len(result)} граничних точок\n"
+            cluster_color = self.cluster_colors[cluster_index]
+            info_string += f"Кластер {cluster_index} ({cluster_color}): {len(result)} граничних точок\n"
 
             if cluster_bound_point_finder.coordinates_count == 2:
                 self.ax.scatter([p.coordinates[0] for p in result],
                                 [p.coordinates[1] for p in result],
-                                s=100, c=colors[cluster_index])
+                                s=100, c=self.cluster_colors[cluster_index])
                 self.ax.scatter(center.coordinates[0], center.coordinates[1], s=150, c='black', marker='X')
-                self.ax.text(center.coordinates[0], center.coordinates[1], str(cluster_index), fontsize=12)
+                self.ax.text(center.coordinates[0], center.coordinates[1], str(cluster_index), fontsize=12, color='red')
             else:
                 self.ax.scatter([p.coordinates[0] for p in result],
                                 [p.coordinates[1] for p in result],
                                 [p.coordinates[2] for p in result],
-                                s=100, c=colors[cluster_index])
+                                s=100, c=self.cluster_colors[cluster_index])
                 self.ax.scatter(center.coordinates[0], center.coordinates[1], center.coordinates[2], s=150,
                                 c='black', marker='X')
-                self.ax.text(center.coordinates[0], center.coordinates[1], center.coordinates[2], str(cluster_index),
-                             fontsize=12)
+                self.ax.text(center.coordinates[0], center.coordinates[1], center.coordinates[2], str(cluster_index), fontsize=12, color='red')
 
         self.info_text.setText(info_string)
         self.ax.set_xlabel("X")
