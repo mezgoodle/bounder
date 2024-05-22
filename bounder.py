@@ -241,25 +241,27 @@ class MainWindow(QWidget):
         self.draw_plot(self.cluster_bound_point_finder)  # Перемальовуємо графік
 
     def on_add_data_click(self):
-        self.input_vectors = [
-            Point([random.uniform(0, 10) for _ in range(self.dimension)]) for _ in range(100)
-        ]
-        self.update_data_table()
-        # text = self.input_edit.text()
-        # try:
-        #     point_strings = text.split(',')  # Розділяємо рядок на точки за допомогою коми
-        #     for point_str in point_strings:
-        #         coordinates = [float(x) for x in point_str.split()]  # Розділяємо координати пробілами
-        #         if len(coordinates) == self.dimension:
-        #             self.input_vectors.append(Point(coordinates))
-        #         else:
-        #             print(
-        #                 f"Невірна кількість координат у точці '{point_str}'. Введіть {self.dimension} координати, розділені пробілами."
-        #             )
-        #     self.update_data_table()
-        #     self.input_edit.clear()
-        # except ValueError:
-        #     print("Некоректний формат введення. Введіть числа, розділені пробілами та комами для розділення точок.")
+        text = self.input_edit.text()
+        if not text:
+            self.input_vectors = [
+                Point([random.uniform(0, 10) for _ in range(self.dimension)]) for _ in range(100)
+            ]
+            self.update_data_table()
+        else:
+            try:
+                point_strings = text.split(',')  # Розділяємо рядок на точки за допомогою коми
+                for point_str in point_strings:
+                    coordinates = [float(x) for x in point_str.split()]  # Розділяємо координати пробілами
+                    if len(coordinates) == self.dimension:
+                        self.input_vectors.append(Point(coordinates))
+                    else:
+                        print(
+                            f"Невірна кількість координат у точці '{point_str}'. Введіть {self.dimension} координати, розділені пробілами."
+                        )
+                self.update_data_table()
+                self.input_edit.clear()
+            except ValueError:
+                print("Некоректний формат введення. Введіть числа, розділені пробілами та комами для розділення точок.")
 
     def draw_plot(self, cluster_bound_point_finder):
         self.ax.cla()  # Очищення графіка
