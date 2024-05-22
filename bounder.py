@@ -3,7 +3,7 @@ import sys
 from PyQt5.QtWidgets import (
     QApplication, QWidget, QLabel, QComboBox, QPushButton, QVBoxLayout,
     QLineEdit, QFileDialog, QGridLayout, QTableWidget, QTableWidgetItem,
-    QSlider, QHBoxLayout
+    QSlider, QHBoxLayout, QTextEdit
 )
 from PyQt5.QtCore import Qt
 from typing import List, Set, Tuple
@@ -91,20 +91,20 @@ class ClusterBoundPointFinder:
     def find_cluster_centers(self) -> Tuple[int, List[Point]]:
         """
         Знаходить центри кластерів за допомогою KMeans
-        та визначає оптимальну кількість кластерів за методом "ліктя".
+        та визначає оптимальну кількість кластерів.
         """
-        wcss = []
-        for i in range(1, self.max_clusters + 1):
-            kmeans = KMeans(n_clusters=i)
-            kmeans.fit([[point.coordinates[0], point.coordinates[1]] for point in self.input_vectors])
-            wcss.append(kmeans.inertia_)
+        threshold = 20  # Поріг для кількості точок
 
-        # Знаходимо оптимальну кількість кластерів
-        # Використовуємо спрощений метод "ліктя"
-        n_clusters = np.argmax(np.diff(wcss)) + 2
+        if len(self.input_vectors) < threshold:
+            n_clusters = 2  # Якщо точок мало, встановлюємо 2 кластери
+        else:
+            wcss = []
+            for i in range(1, self.max_clusters + 1):
+                kmeans = KMeans(n_clusters=i)
+                kmeans.fit([[p.coordinates[j] for j in range(self.coordinates_count)] for p in self.input_vectors])
+                wcss.append(kmeans.inertia_)
+            n_clusters = np.argmax(np.diff(wcss)) + 2  # Якщо точок багато, використовуємо метод "ліктя"
 
-        # Повторно запускаємо KMeans з оптимальною кількістю кластерів
-        # n_clusters = 2
         kmeans = KMeans(n_clusters=n_clusters)
         kmeans.fit([[p.coordinates[i] for i in range(self.coordinates_count)] for p in self.input_vectors])
         cluster_centers = [Point(center.tolist()) for center in kmeans.cluster_centers_]
@@ -174,6 +174,10 @@ class MainWindow(QWidget):
         # Мітка для значення deviation
         self.deviation_label = QLabel(f"Deviation: {self.deviation:.2f}", self)
 
+        # Текстове поле для виведення інформації
+        self.info_text = QTextEdit(self)
+        self.info_text.setReadOnly(True)
+
         # Розміщення віджетів
         hbox = QHBoxLayout()
         hbox.addWidget(self.canvas)
@@ -181,7 +185,8 @@ class MainWindow(QWidget):
         vbox.addWidget(self.slider)
         vbox.addWidget(self.deviation_label)
         hbox.addLayout(vbox)
-        grid.addLayout(hbox, 6, 0, 1, 3)  # Додаємо графік та повзунок
+        hbox.addWidget(self.info_text)  # Додаємо текстове поле
+        grid.addLayout(hbox, 6, 0, 1, 3)
 
     def on_dimension_select(self):
         self.dimension = int(self.dimension_combobox.currentText())
@@ -278,9 +283,11 @@ class MainWindow(QWidget):
                             [p.coordinates[2] for p in cluster_bound_point_finder.input_vectors],
                             s=100, label="All points", c='grey')
 
+        info_string = ""
         for cluster_index in range(len(cluster_bound_point_finder.cluster_centers)):
             center = cluster_bound_point_finder.cluster_centers[cluster_index]
             result = cluster_bound_point_finder.border_points[cluster_index]  # Беремо вже обчислені граничні точки
+            info_string += f"Кластер {cluster_index}: {len(result)} граничних точок\n"
 
             if cluster_bound_point_finder.coordinates_count == 2:
                 self.ax.scatter([p.coordinates[0] for p in result],
@@ -298,6 +305,7 @@ class MainWindow(QWidget):
                 self.ax.text(center.coordinates[0], center.coordinates[1], center.coordinates[2], str(cluster_index),
                              fontsize=12)
 
+        self.info_text.setText(info_string)
         self.ax.set_xlabel("X")
         self.ax.set_ylabel("Y")
         if cluster_bound_point_finder.coordinates_count == 3:
