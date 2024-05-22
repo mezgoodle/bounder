@@ -191,8 +191,13 @@ class MainWindow(QWidget):
     def on_dimension_select(self):
         self.dimension = int(self.dimension_combobox.currentText())
         print(f"Обрана розмірність: {self.dimension}")
+
+        # Очищуємо список точок
+        self.input_vectors = []
+
         self.data_table.setColumnCount(self.dimension)
         self.data_table.setHorizontalHeaderLabels([f"X{i + 1}" for i in range(self.dimension)])
+        self.update_data_table()  # Оновлюємо таблицю
 
         # Оновлення графіка (видалення старого та створення нового)
         self.figure.clear()
