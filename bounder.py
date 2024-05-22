@@ -143,6 +143,11 @@ class MainWindow(QWidget):
         self.data_table.setColumnCount(self.dimension)
         self.data_table.setHorizontalHeaderLabels([f"X{i + 1}" for i in range(self.dimension)])
 
+        # Таблиця для відображення координат граничних точок
+        self.border_points_table = QTableWidget(self)
+        self.border_points_table.setColumnCount(self.dimension)
+        self.border_points_table.setHorizontalHeaderLabels([f"X{i + 1}" for i in range(self.dimension)])
+
         # Розміщення віджетів
         grid = QGridLayout()
         grid.addWidget(self.dimension_label, 0, 0)
@@ -152,6 +157,7 @@ class MainWindow(QWidget):
         grid.addWidget(self.input_edit, 2, 0, 1, 3)
         grid.addWidget(self.file_button, 3, 0)
         grid.addWidget(self.data_table, 4, 0, 1, 3)  # Додаємо таблицю
+        grid.addWidget(self.border_points_table, 7, 0, 1, 3)  # Додаємо таблицю граничних точок
         self.setLayout(grid)
 
         self.calculate_button = QPushButton("Розрахувати", self)
@@ -246,6 +252,7 @@ class MainWindow(QWidget):
             self.cluster_colors[cluster_index] = colors[cluster_index]
 
         self.draw_plot(self.cluster_bound_point_finder)
+        self.update_border_points_table()  # Оновлюємо таблицю граничних точок
 
     def on_slider_change(self):
         self.deviation = self.slider.value() / 100
@@ -257,6 +264,7 @@ class MainWindow(QWidget):
         self.cluster_bound_point_finder.calculate_bound_points()
 
         self.draw_plot(self.cluster_bound_point_finder)  # Перемальовуємо графік
+        self.update_border_points_table()  # Оновлюємо таблицю граничних точок
 
     def on_add_data_click(self):
         text = self.input_edit.text()
@@ -280,6 +288,17 @@ class MainWindow(QWidget):
                 self.input_edit.clear()
             except ValueError:
                 print("Некоректний формат введення. Введіть числа, розділені пробілами та комами для розділення точок.")
+
+    def update_border_points_table(self):
+        border_points = []
+        for cluster_index in range(len(self.cluster_bound_point_finder.border_points)):
+            border_points.extend(list(self.cluster_bound_point_finder.border_points[cluster_index].keys()))
+
+        self.border_points_table.setRowCount(len(border_points))
+        for i, point in enumerate(border_points):
+            for j, coord in enumerate(point.coordinates):
+                item = QTableWidgetItem(str(coord))
+                self.border_points_table.setItem(i, j, item)
 
     def draw_plot(self, cluster_bound_point_finder):
         self.ax.cla()  # Очищення графіка
