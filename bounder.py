@@ -372,7 +372,7 @@ class MainWindow(QWidget):
                                 [p.coordinates[1] for p in result],
                                 s=100, c=self.cluster_colors[cluster_index])
                 self.ax.scatter(center.coordinates[0], center.coordinates[1], s=150, c='black', marker='X')
-                self.ax.text(center.coordinates[0], center.coordinates[1], str(cluster_index), fontsize=12, color='red')
+                self.ax.text(center.coordinates[0], center.coordinates[1], str(cluster_index), fontsize=14, color='red')
             else:
                 self.ax.scatter([p.coordinates[0] for p in result],
                                 [p.coordinates[1] for p in result],
