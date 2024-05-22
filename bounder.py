@@ -148,25 +148,17 @@ class MainWindow(QWidget):
         self.border_points_table.setColumnCount(self.dimension)
         self.border_points_table.setHorizontalHeaderLabels([f"X{i + 1}" for i in range(self.dimension)])
 
-        # Розміщення віджетів
-        grid = QGridLayout()
-        grid.addWidget(self.dimension_label, 0, 0)
-        grid.addWidget(self.dimension_combobox, 0, 1)
-        grid.addWidget(self.dimension_button, 0, 2)
-        grid.addWidget(self.input_label, 1, 0)
-        grid.addWidget(self.input_edit, 2, 0, 1, 3)
-        grid.addWidget(self.file_button, 3, 0)
-        grid.addWidget(self.data_table, 4, 0, 1, 3)  # Додаємо таблицю
-        grid.addWidget(self.border_points_table, 7, 0, 1, 3)  # Додаємо таблицю граничних точок
-        self.setLayout(grid)
+        # Мітки для таблиць
+        self.data_table_label = QLabel("Список точок:", self)
+        self.border_points_table_label = QLabel("Список border точок:", self)
 
-        self.calculate_button = QPushButton("Розрахувати", self)
-        self.calculate_button.clicked.connect(self.on_calculate_click)
-        grid.addWidget(self.calculate_button, 5, 0)  # Додаємо кнопку
-
+        # Кнопка "Додати"
         self.add_button = QPushButton("Додати", self)
         self.add_button.clicked.connect(self.on_add_data_click)
-        grid.addWidget(self.add_button, 3, 1)  # Додаємо кнопку "Додати"
+
+        # Кнопка "Розрахувати"
+        self.calculate_button = QPushButton("Розрахувати", self)
+        self.calculate_button.clicked.connect(self.on_calculate_click)
 
         # Графік
         self.figure = plt.figure()
@@ -188,14 +180,56 @@ class MainWindow(QWidget):
         self.info_text.setReadOnly(True)
 
         # Розміщення віджетів
-        hbox = QHBoxLayout()
-        hbox.addWidget(self.canvas)
-        vbox = QVBoxLayout()
-        vbox.addWidget(self.slider)
-        vbox.addWidget(self.deviation_label)
-        hbox.addLayout(vbox)
-        hbox.addWidget(self.info_text)  # Додаємо текстове поле
-        grid.addLayout(hbox, 6, 0, 1, 3)
+        vbox_main = QVBoxLayout(self)  # Головний QVBoxLayout
+
+        # --- Верхня частина ---
+        grid_top = QGridLayout()
+        grid_top.addWidget(self.dimension_label, 0, 0)
+        grid_top.addWidget(self.dimension_combobox, 0, 1)
+        grid_top.addWidget(self.dimension_button, 0, 2)
+        grid_top.addWidget(self.input_label, 1, 0)
+        grid_top.addWidget(self.input_edit, 2, 0, 1, 3)
+        grid_top.addWidget(self.file_button, 3, 0)
+        grid_top.addWidget(self.add_button, 3, 1)
+        vbox_main.addLayout(grid_top)  # Додаємо grid_top до vbox_main
+
+        # --- Таблиця точок ---
+        vbox_table1 = QVBoxLayout()
+        vbox_table1.addWidget(self.data_table_label)
+        vbox_table1.addWidget(self.data_table)
+        vbox_main.addLayout(vbox_table1)  # Додаємо vbox_table1 до vbox_main
+
+        # --- Кнопка "Розрахувати" ---
+        vbox_main.addWidget(self.calculate_button)
+
+        # --- Нижня частина ---
+        hbox_bottom = QHBoxLayout()
+
+        # --- Графік і повзунок ---
+        vbox_plot = QVBoxLayout()
+        vbox_plot.addWidget(self.canvas)
+        vbox_slider = QVBoxLayout()
+        vbox_slider.addWidget(self.slider)
+        vbox_slider.addWidget(self.deviation_label)
+        vbox_plot.addLayout(vbox_slider)
+        hbox_bottom.addLayout(vbox_plot)  # Додаємо vbox_plot до hbox_bottom
+
+        # --- Текстове поле та таблиця граничних точок ---
+        vbox_info = QVBoxLayout()
+        vbox_info.addWidget(self.info_text)
+        vbox_table2 = QVBoxLayout()
+        vbox_table2.addWidget(self.border_points_table_label)
+        vbox_table2.addWidget(self.border_points_table)
+        vbox_info.addLayout(vbox_table2)
+        hbox_bottom.addLayout(vbox_info)  # Додаємо vbox_info до hbox_bottom
+
+        vbox_main.addLayout(hbox_bottom)  # Додаємо hbox_bottom до vbox_main
+
+        # --- Збільшення відступів ---
+        vbox_main.setContentsMargins(20, 20, 20, 20)  # Відступи навколо головного віджета
+        grid_top.setContentsMargins(10, 10, 10, 10)  # Відступи навколо grid_top
+        vbox_table1.setContentsMargins(10, 10, 10, 10)  # Відступи навколо таблиці точок
+        vbox_table2.setContentsMargins(10, 10, 10, 10)  # Відступи навколо таблиці граничних точок
 
     def on_dimension_select(self):
         self.dimension = int(self.dimension_combobox.currentText())
