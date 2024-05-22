@@ -235,12 +235,20 @@ class MainWindow(QWidget):
         self.dimension = int(self.dimension_combobox.currentText())
         print(f"Обрана розмірність: {self.dimension}")
 
-        # Очищуємо список точок
+        # Очищуємо списки точок та граничних точок
         self.input_vectors = []
+        if hasattr(self, 'cluster_bound_point_finder'):
+            self.cluster_bound_point_finder.border_points = []
 
+        # Оновлюємо кількість стовпців в обох таблицях
         self.data_table.setColumnCount(self.dimension)
         self.data_table.setHorizontalHeaderLabels([f"X{i + 1}" for i in range(self.dimension)])
-        self.update_data_table()  # Оновлюємо таблицю
+        self.update_data_table()  # Оновлюємо таблицю точок
+
+        self.border_points_table.setColumnCount(self.dimension)
+        self.border_points_table.setHorizontalHeaderLabels([f"X{i + 1}" for i in range(self.dimension)])
+        if hasattr(self, 'cluster_bound_point_finder'):  # Додано умову
+            self.update_border_points_table()  # Оновлюємо таблицю граничних точок
 
         # Оновлення графіка (видалення старого та створення нового)
         self.figure.clear()
@@ -301,27 +309,32 @@ class MainWindow(QWidget):
         self.update_border_points_table()  # Оновлюємо таблицю граничних точок
 
     def on_add_data_click(self):
+        # Очищуємо списки точок та граничних точок
+        self.input_vectors = []
+        if hasattr(self, 'cluster_bound_point_finder'):
+            self.cluster_bound_point_finder.border_points = []
+
         text = self.input_edit.text()
-        if not text:
+        if not text:  # Якщо текстове поле пусте, генеруємо випадкові точки
             self.input_vectors = [
                 Point([random.uniform(0, 10) for _ in range(self.dimension)]) for _ in range(100)
             ]
-            self.update_data_table()
-        else:
+        else:  # Інакше додаємо точки з текстового поля
             try:
-                point_strings = text.split(',')  # Розділяємо рядок на точки за допомогою коми
+                point_strings = text.split(',')
                 for point_str in point_strings:
-                    coordinates = [float(x) for x in point_str.split()]  # Розділяємо координати пробілами
+                    coordinates = [float(x) for x in point_str.split()]
                     if len(coordinates) == self.dimension:
                         self.input_vectors.append(Point(coordinates))
                     else:
                         print(
                             f"Невірна кількість координат у точці '{point_str}'. Введіть {self.dimension} координати, розділені пробілами."
                         )
-                self.update_data_table()
-                self.input_edit.clear()
+                self.input_edit.clear()  # Очищуємо текстове поле
             except ValueError:
                 print("Некоректний формат введення. Введіть числа, розділені пробілами та комами для розділення точок.")
+
+        self.update_data_table()  # Оновлюємо таблицю
 
     def update_border_points_table(self):
         border_points = []
@@ -330,8 +343,8 @@ class MainWindow(QWidget):
 
         self.border_points_table.setRowCount(len(border_points))
         for i, point in enumerate(border_points):
-            for j, coord in enumerate(point.coordinates):
-                item = QTableWidgetItem(str(coord))
+            for j in range(self.dimension):  # Використовуємо self.dimension для кількості координат
+                item = QTableWidgetItem(str(point.coordinates[j]))  # Виводимо j-ту координату
                 self.border_points_table.setItem(i, j, item)
 
     def draw_plot(self, cluster_bound_point_finder):
