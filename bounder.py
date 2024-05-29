@@ -1,3 +1,4 @@
+import math
 import random
 import sys
 from typing import List, Set, Tuple
@@ -26,6 +27,9 @@ class Point:
         """
         self.coordinates = coordinates
 
+    def get_coordinates(self) -> List[float]:
+        return self.coordinates
+
     def __eq__(self, other):
         """Перевизначений метод для порівняння точок."""
         return self.coordinates == other.coordinates
@@ -44,8 +48,13 @@ def calculate_centre(points: Set[Point], key_point: Point, coordinates_count: in
     :param coordinates_count: Кількість координат у кожній точці.
     :return: Точка, що представляє центр множини точок.
     """
-    all_points = list(points) + [key_point]
-    return Point([np.mean([point.coordinates[i] for point in all_points]) for i in range(coordinates_count)])
+    all_points = list(points)
+    all_points.append(key_point)
+    centre_coordinates = [
+        sum(point.get_coordinates()[i] for point in all_points) / len(all_points)
+        for i in range(coordinates_count)
+    ]
+    return Point(centre_coordinates)
 
 
 def calc_distance(point_a: Point, point_b: Point) -> float:
@@ -56,7 +65,12 @@ def calc_distance(point_a: Point, point_b: Point) -> float:
     :param point_b: Друга точка.
     :return: Відстань між точками.
     """
-    return np.sqrt(sum((a - b) ** 2 for a, b in zip(point_a.coordinates, point_b.coordinates)))
+    return math.sqrt(
+        sum(
+            (point_a.get_coordinates()[i] - point_b.get_coordinates()[i]) ** 2
+            for i in range(len(point_a.get_coordinates()))
+        )
+    )
 
 
 def calculate_point_offset(point: Point, centre: Point, mean_distance: float) -> float:
@@ -87,7 +101,7 @@ class ClusterBoundPointFinder:
         self.deviation = deviation
         self.max_clusters = max_clusters
         self.coordinates_count = len(input_vectors[0].coordinates) if input_vectors else 0
-        self.core_point_count = 5
+        self.core_point_count = 20
         self.n_clusters, self.cluster_centers = self.find_cluster_centers()
         self.kmeans_clusters = None  # Зберігає результат кластеризації KMeans
         self.border_points = []  # Зберігає граничні точки для кожного кластера
@@ -147,7 +161,7 @@ class ClusterBoundPointFinder:
             # Додаємо точку до списку граничних точок, якщо її відхилення більше заданого порогу
             result = {point: offset for point, offset in point_offsets.items() if offset > self.deviation}
             self.border_points.append(result)
-            print(f"  Cluster {cluster_index}: {len(result)} border points")
+            print(f"  Cluster {cluster_index}: {len(result)} border points. Deviation: {self.deviation}")
 
     def find_cluster_centers(self) -> Tuple[int, List[Point]]:
         """
@@ -345,8 +359,11 @@ class MainWindow(QWidget):
         with open(file_name, 'r') as f:
             for line in f:
                 coordinates = [float(x) for x in line.split()]
-                if len(coordinates) == self.dimension:
-                    self.input_vectors.append(Point(coordinates))
+                self.input_vectors.append(Point(coordinates))
+
+        # Проектуємо точки одразу після завантаження
+        self.input_vectors = self.project_to_3d(self.input_vectors)
+
         print(f"Дані завантажено з файлу: {file_name}")
         print(f"Кількість точок: {len(self.input_vectors)}")
         self.update_data_table()  # Оновлюємо таблицю після завантаження даних
@@ -417,6 +434,9 @@ class MainWindow(QWidget):
             except ValueError:
                 print("Некоректний формат введення. Введіть числа, розділені пробілами та комами для розділення точок.")
 
+        # Проектуємо точки одразу після додавання
+        self.input_vectors = self.project_to_3d(self.input_vectors)
+
         self.update_data_table()  # Оновлюємо таблицю
 
     def update_border_points_table(self):
@@ -438,7 +458,7 @@ class MainWindow(QWidget):
         :param points: Список точок для проекції.
         :return: Список точок, спроектованих на 3D простір.
         """
-        if self.dimension <= 3:
+        if len(points[0].get_coordinates()) <= 3:
             return points  # Немає необхідності в проекції, якщо розмірність <= 3
 
         # Створюємо масив NumPy з координат точок
