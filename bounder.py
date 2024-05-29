@@ -155,18 +155,17 @@ class ClusterBoundPointFinder:
 
         :return: Кортеж з кількістю кластерів та списком центрів кластерів.
         """
-        threshold = 20  # Поріг для кількості точок
+        threshold = 30  # Поріг для кількості точок
 
         if len(self.input_vectors) < threshold:
-            n_clusters = 2  # Якщо точок мало, встановлюємо 2 кластери
+            n_clusters = 1
         else:
-            # Використовуємо метод "ліктя" для визначення оптимальної кількості кластерів
             wcss = []
             for i in range(1, self.max_clusters + 1):
                 kmeans = KMeans(n_clusters=i)
                 kmeans.fit([[p.coordinates[j] for j in range(self.coordinates_count)] for p in self.input_vectors])
                 wcss.append(kmeans.inertia_)
-            n_clusters = np.argmax(np.diff(wcss)) + 2
+            n_clusters = np.argmax(np.diff(wcss))
 
         kmeans = KMeans(n_clusters=n_clusters)
         kmeans.fit([[p.coordinates[i] for i in range(self.coordinates_count)] for p in self.input_vectors])
