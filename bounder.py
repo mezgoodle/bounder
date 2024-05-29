@@ -89,7 +89,7 @@ class ClusterBoundPointFinder:
     """
     Клас для знаходження граничних точок в кластерах.
     """
-    def __init__(self, input_vectors: List[Point], deviation: float, max_clusters=10):
+    def __init__(self, input_vectors: List[Point], deviation: float, max_clusters=10, core_point_count=20):
         """
         Ініціалізує об'єкт ClusterBoundPointFinder.
 
@@ -101,7 +101,7 @@ class ClusterBoundPointFinder:
         self.deviation = deviation
         self.max_clusters = max_clusters
         self.coordinates_count = len(input_vectors[0].coordinates) if input_vectors else 0
-        self.core_point_count = 20
+        self.core_point_count = core_point_count * 4
         self.n_clusters, self.cluster_centers = self.find_cluster_centers()
         self.kmeans_clusters = None  # Зберігає результат кластеризації KMeans
         self.border_points = []  # Зберігає граничні точки для кожного кластера
@@ -139,8 +139,8 @@ class ClusterBoundPointFinder:
 
             # Знаходимо найближчі точки для кожної точки в кластері
             closest_distances = {
-                point: dict(sorted(distances[point].items(), key=lambda item: item[1])[: self.core_point_count])
-                for point in distances
+                point: dict(sorted(distances[point].items(), key=lambda item: item[1])[:self.core_point_count])
+                for point in distances if point not in distances[point]
             }
 
             # Обчислюємо середню відстань до найближчих точок
@@ -159,7 +159,7 @@ class ClusterBoundPointFinder:
             }
 
             # Додаємо точку до списку граничних точок, якщо її відхилення більше заданого порогу
-            result = {point: offset for point, offset in point_offsets.items() if offset > self.deviation}
+            result = {point: offset for point, offset in point_offsets.items() if offset > self.deviation*1.5}
             self.border_points.append(result)
             print(f"  Cluster {cluster_index}: {len(result)} border points. Deviation: {self.deviation}")
 
@@ -201,6 +201,12 @@ class MainWindow(QWidget):
         self.dimension = 2  # Початкова розмірність простору ознак
         self.input_vectors = []  # Список вхідних точок
         self.deviation = 0.15  # Початкове значення відхилення
+        self.core_point_count = 5  # Початкове значення
+
+        # Віджети для вибору кількості точок
+        self.core_point_label = QLabel("Core Point Count:", self)
+        self.core_point_edit = QLineEdit(self)
+        self.core_point_edit.setText(str(self.core_point_count))  # Встановлюємо початкове значення у поле вводу
 
         # Віджети для вибору розмірності
         self.dimension_label = QLabel("Оберіть розмірність простору ознак:")
@@ -288,6 +294,8 @@ class MainWindow(QWidget):
         vbox_slider = QVBoxLayout()
         vbox_slider.addWidget(self.slider)
         vbox_slider.addWidget(self.deviation_label)
+        vbox_slider.addWidget(self.core_point_label)
+        vbox_slider.addWidget(self.core_point_edit)
         vbox_plot.addLayout(vbox_slider)
         hbox_bottom.addLayout(vbox_plot)  # Додаємо vbox_plot до hbox_bottom
 
@@ -379,10 +387,14 @@ class MainWindow(QWidget):
     def on_calculate_click(self):
         """Обробляє натискання кнопки "Розрахувати"."""
         # Проектуємо точки на 3D простір, якщо потрібно
+        try:
+            self.core_point_count = int(self.core_point_edit.text())
+        except ValueError:
+            print("Некоректне значення Core Point Count. Використовується значення за замовчуванням (20).")
         projected_points = self.project_to_3d(self.input_vectors)
 
         self.cluster_bound_point_finder = ClusterBoundPointFinder(
-            projected_points, self.deviation
+            projected_points, self.deviation, core_point_count=self.core_point_count
         )
         self.cluster_bound_point_finder.calculate_bound_points()
 
