@@ -3,27 +3,26 @@ import random
 import sys
 from typing import List, Set, Tuple
 
+import matplotlib.pyplot as plt
 import numpy as np
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import (QApplication, QWidget, QLabel, QComboBox, QPushButton, QVBoxLayout,
                              QLineEdit, QFileDialog, QGridLayout, QTableWidget, QTableWidgetItem,
                              QSlider, QHBoxLayout, QTextEdit)
-import matplotlib.pyplot as plt
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from sklearn.cluster import KMeans
-from sklearn.decomposition import PCA  # Додаємо PCA для проекції
-from mpl_toolkits.mplot3d import Axes3D
+from sklearn.decomposition import PCA  # Adding PCA for projection
 
 
 class Point:
     """
-    Клас, що представляє точку в багатовимірному просторі.
+    A class that represents a point in a multidimensional space.
     """
     def __init__(self, coordinates: List[float]):
         """
-        Ініціалізує об'єкт Point.
+        Initializes the Point object.
 
-        :param coordinates: Список координат точки.
+        :param coordinates: A list of point coordinates.
         """
         self.coordinates = coordinates
 
@@ -31,22 +30,22 @@ class Point:
         return self.coordinates
 
     def __eq__(self, other):
-        """Перевизначений метод для порівняння точок."""
+        """Overrides the method for comparing points."""
         return self.coordinates == other.coordinates
 
     def __hash__(self):
-        """Перевизначений метод для використання точок в множинах."""
+        """Overrides the method for using points in sets."""
         return hash(tuple(self.coordinates))
 
 
 def calculate_centre(points: Set[Point], key_point: Point, coordinates_count: int) -> Point:
     """
-    Обчислює центр множини точок, включаючи одну ключову точку.
+    Calculates the centre of a set of points, including one key point.
 
-    :param points: Множина точок.
-    :param key_point: Ключова точка, яка також враховується при обчисленні центру.
-    :param coordinates_count: Кількість координат у кожній точці.
-    :return: Точка, що представляє центр множини точок.
+    :param points: A set of points.
+    :param key_point: The key point that is also taken into account when calculating the centre.
+    :param coordinates_count: The number of coordinates in each point.
+    :return: A point representing the centre of the set of points.
     """
     all_points = list(points)
     all_points.append(key_point)
@@ -59,11 +58,11 @@ def calculate_centre(points: Set[Point], key_point: Point, coordinates_count: in
 
 def calc_distance(point_a: Point, point_b: Point) -> float:
     """
-    Обчислює відстань між двома точками.
+    Calculates the distance between two points.
 
-    :param point_a: Перша точка.
-    :param point_b: Друга точка.
-    :return: Відстань між точками.
+    :param point_a: The first point.
+    :param point_b: The second point.
+    :return: The distance between the points.
     """
     return math.sqrt(
         sum(
@@ -75,27 +74,27 @@ def calc_distance(point_a: Point, point_b: Point) -> float:
 
 def calculate_point_offset(point: Point, centre: Point, mean_distance: float) -> float:
     """
-    Обчислює відхилення точки від центру, нормалізоване до середньої відстані.
+    Calculates the deviation of a point from the centre, normalised to the average distance.
 
-    :param point: Точка, для якої обчислюється відхилення.
-    :param centre: Центр кластера.
-    :param mean_distance: Середня відстань від точки до її сусідів.
-    :return: Нормалізоване відхилення точки від центру.
+    :param point: The point for which the deviation is calculated.
+    :param centre: The centre of the cluster.
+    :param mean_distance: The average distance from the point to its neighbours.
+    :return: The normalised deviation of the point from the centre.
     """
     return calc_distance(point, centre) / mean_distance
 
 
 class ClusterBoundPointFinder:
     """
-    Клас для знаходження граничних точок в кластерах.
+    A class for finding boundary points in clusters.
     """
     def __init__(self, input_vectors: List[Point], deviation: float, max_clusters=10, core_point_count=20):
         """
-        Ініціалізує об'єкт ClusterBoundPointFinder.
+        Initialises the ClusterBoundPointFinder object.
 
-        :param input_vectors: Список точок для кластеризації.
-        :param deviation: Значення відхилення для визначення граничних точок.
-        :param max_clusters: Максимальна кількість кластерів, яку слід розглянути.
+        :param input_vectors: A list of points to cluster.
+        :param deviation: The deviation value for determining the boundary points.
+        :param max_clusters: The maximum number of clusters to consider.
         """
         self.input_vectors = input_vectors
         self.deviation = deviation
@@ -103,12 +102,12 @@ class ClusterBoundPointFinder:
         self.coordinates_count = len(input_vectors[0].coordinates) if input_vectors else 0
         self.core_point_count = core_point_count * 4
         self.n_clusters, self.cluster_centers = self.find_cluster_centers()
-        self.kmeans_clusters = None  # Зберігає результат кластеризації KMeans
-        self.border_points = []  # Зберігає граничні точки для кожного кластера
+        self.kmeans_clusters = None  # Saves the result of KMeans clustering
+        self.border_points = []  # Stores boundary points for each cluster
 
     def calculate_bound_points(self):
         """
-        Обчислює граничні точки в кожному кластері.
+        Calculates the boundary points in each cluster.
         """
         if self.kmeans_clusters is None:
             self.kmeans = KMeans(n_clusters=self.n_clusters)
@@ -116,10 +115,10 @@ class ClusterBoundPointFinder:
                 [[p.coordinates[i] for i in range(self.coordinates_count)] for p in self.input_vectors]
             )
 
-            # Оновлюємо центри кластерів з KMeans
+            # Updating cluster centres with KMeans
             self.cluster_centers = [Point(center.tolist()) for center in self.kmeans.cluster_centers_]
 
-        self.border_points = []  # Очищуємо список граничних точок
+        self.border_points = []  # Clear the list of boundary points
         for cluster_index in range(self.n_clusters):
             # Обираємо точки, що належать до поточного кластера
             cluster_points = [
@@ -127,7 +126,7 @@ class ClusterBoundPointFinder:
             ]
             center = self.cluster_centers[cluster_index]
 
-            # Обчислюємо відстані між точками в кластері
+            # Calculate distances between points in a cluster
             distances = {
                 point: {
                     inner_point: calc_distance(point, inner_point)
@@ -137,16 +136,16 @@ class ClusterBoundPointFinder:
                 for point in cluster_points
             }
 
-            # Знаходимо найближчі точки для кожної точки в кластері
+            # Find the closest points for each point in the cluster
             closest_distances = {
                 point: dict(sorted(distances[point].items(), key=lambda item: item[1])[:self.core_point_count])
                 for point in distances if point not in distances[point]
             }
 
-            # Обчислюємо середню відстань до найближчих точок
+            # Calculate the average distance to the nearest points
             mean_distances = {point: np.mean(list(dist.values())) for point, dist in closest_distances.items()}
 
-            # Обчислюємо центр для кожної точки та її сусідів
+            # Calculate the centre for each point and its neighbours
             point_centres = {
                 point: calculate_centre(set(closest.keys()), point, self.coordinates_count)
                 for point, closest in closest_distances.items()
@@ -158,18 +157,18 @@ class ClusterBoundPointFinder:
                 for point, centre in point_centres.items()
             }
 
-            # Додаємо точку до списку граничних точок, якщо її відхилення більше заданого порогу
-            result = {point: offset for point, offset in point_offsets.items() if offset > self.deviation*1.5}
+            # Add a point to the list of boundary points if its deviation is greater than the specified threshold
+            result = {point: offset for point, offset in point_offsets.items() if offset > self.deviation}
             self.border_points.append(result)
             print(f"  Cluster {cluster_index}: {len(result)} border points. Deviation: {self.deviation}")
 
     def find_cluster_centers(self) -> Tuple[int, List[Point]]:
         """
-        Знаходить центри кластерів за допомогою KMeans та визначає оптимальну кількість кластерів.
+        Finds cluster centres using KMeans and determines the optimal number of clusters.
 
-        :return: Кортеж з кількістю кластерів та списком центрів кластерів.
+        :return: A tuple with the number of clusters and a list of cluster centres.
         """
-        threshold = 30  # Поріг для кількості точок
+        threshold = 30  # Threshold for the number of points
 
         if len(self.input_vectors) < threshold:
             n_clusters = 1
@@ -189,66 +188,66 @@ class ClusterBoundPointFinder:
 
 class MainWindow(QWidget):
     """
-    Головне вікно програми.
+    The main window of the program.
     """
     def __init__(self):
         super().__init__()
         self.initUI()
 
     def initUI(self):
-        """Ініціалізує інтерфейс користувача."""
-        self.setWindowTitle("Пошук граничних точок кластерів")
-        self.dimension = 2  # Початкова розмірність простору ознак
-        self.input_vectors = []  # Список вхідних точок
-        self.deviation = 0.15  # Початкове значення відхилення
-        self.core_point_count = 5  # Початкове значення
+        """Initialises the user interface."""
+        self.setWindowTitle("Search for cluster boundary points")
+        self.dimension = 2 # Initial dimension of the feature space
+        self.input_vectors = [] # List of input points
+        self.deviation = 0.15 # Initial deviation value
+        self.core_point_count = 5 # Initial value
 
-        # Віджети для вибору кількості точок
+        # Widgets for selecting the number of points
         self.core_point_label = QLabel("Core Point Count:", self)
         self.core_point_edit = QLineEdit(self)
-        self.core_point_edit.setText(str(self.core_point_count))  # Встановлюємо початкове значення у поле вводу
+        self.core_point_edit.setText(str(self.core_point_count))  # Set the initial value in the input field
 
-        # Віджети для вибору розмірності
-        self.dimension_label = QLabel("Оберіть розмірність простору ознак:")
+        # Widgets for selecting a dimension
+        self.dimension_label = QLabel("Select the dimension of the feature space:")
         self.dimension_combobox = QComboBox(self)
         self.dimension_combobox.addItems(["2", "3"])
-        self.dimension_button = QPushButton("Обрати", self)
+        self.dimension_button = QPushButton("Select", self)
         self.dimension_button.clicked.connect(self.on_dimension_select)
 
-        # Віджети для введення даних
-        self.input_label = QLabel("Введіть точки:")
+        # Widgets for data entry
+        self.input_label = QLabel("Enter the points:")
         self.input_edit = QLineEdit(self)
-        self.file_button = QPushButton("Обрати файл", self)
+        self.file_button = QPushButton("Select file", self)
         self.file_button.clicked.connect(self.on_file_select)
 
-        # Таблиця для відображення даних
+        # Table for displaying data
         self.data_table = QTableWidget(self)
         self.data_table.setColumnCount(self.dimension)
         self.data_table.setHorizontalHeaderLabels([f"X{i + 1}" for i in range(self.dimension)])
 
-        # Таблиця для відображення координат граничних точок
+        # Table for displaying the coordinates of boundary points
         self.border_points_table = QTableWidget(self)
         self.border_points_table.setColumnCount(self.dimension)
         self.border_points_table.setHorizontalHeaderLabels([f"X{i + 1}" for i in range(self.dimension)])
 
-        # Мітки для таблиць
-        self.data_table_label = QLabel("Список точок:", self)
-        self.border_points_table_label = QLabel("Список граничних точок:", self)
+        # Labels for tables
+        self.data_table_label = QLabel("List of points:", self)
+        self.border_points_table_label = QLabel("List of limit points:", self)
 
-        # Кнопка "Додати"
-        self.add_button = QPushButton("Додати точки", self)
+        # Button ‘Add’
+        self.add_button = QPushButton("Add points", self)
         self.add_button.clicked.connect(self.on_add_data_click)
 
-        # Кнопка "Розрахувати"
-        self.calculate_button = QPushButton("Розрахувати", self)
+        # Button ‘Calculate’
+        self.calculate_button = QPushButton("Calculate", self)
         self.calculate_button.clicked.connect(self.on_calculate_click)
 
-        # Графік
+        # Schedule
         self.figure = plt.figure()
         self.canvas = FigureCanvas(self.figure)
-        self.ax = self.figure.add_subplot(111)  # Початково 2D графік
+        self.ax = self.figure.add_subplot(111)  # Initially 2D graph
 
-        # Повзунок для зміни значення відхилення
+        # Slider to change the deviation value
         self.slider = QSlider(Qt.Horizontal)
         self.slider.setMinimum(15)
         self.slider.setMaximum(100)
@@ -258,14 +257,14 @@ class MainWindow(QWidget):
         # Мітка для значення deviation
         self.deviation_label = QLabel(f"Deviation: {self.deviation:.2f}", self)
 
-        # Текстове поле для виведення інформації
+        # Text field for displaying information
         self.info_text = QTextEdit(self)
         self.info_text.setReadOnly(True)
 
-        # Розміщення віджетів
-        vbox_main = QVBoxLayout(self)  # Головний QVBoxLayout
+        # Placement of widgets
+        vbox_main = QVBoxLayout(self)  # Main QVBoxLayout
 
-        # --- Верхня частина ---
+        # --- Upper part ---
         grid_top = QGridLayout()
         grid_top.addWidget(self.dimension_label, 0, 0)
         grid_top.addWidget(self.dimension_combobox, 0, 1)
@@ -274,18 +273,18 @@ class MainWindow(QWidget):
         grid_top.addWidget(self.input_edit, 2, 0, 1, 3)
         grid_top.addWidget(self.file_button, 3, 0)
         grid_top.addWidget(self.add_button, 3, 1)
-        vbox_main.addLayout(grid_top)  # Додаємо grid_top до vbox_main
+        vbox_main.addLayout(grid_top)  # Add grid_top to vbox_main
 
-        # --- Таблиця точок ---
+        # --- Table of points ---
         vbox_table1 = QVBoxLayout()
         vbox_table1.addWidget(self.data_table_label)
         vbox_table1.addWidget(self.data_table)
-        vbox_main.addLayout(vbox_table1)  # Додаємо vbox_table1 до vbox_main
+        vbox_main.addLayout(vbox_table1)  # Add vbox_table1 to vbox_main
 
-        # --- Кнопка "Розрахувати" ---
+        # --- Button ‘Calculate’ ---
         vbox_main.addWidget(self.calculate_button)
 
-        # --- Нижня частина ---
+        # --- Lower part ---
         hbox_bottom = QHBoxLayout()
 
         # --- Графік і повзунок ---
@@ -297,46 +296,46 @@ class MainWindow(QWidget):
         vbox_slider.addWidget(self.core_point_label)
         vbox_slider.addWidget(self.core_point_edit)
         vbox_plot.addLayout(vbox_slider)
-        hbox_bottom.addLayout(vbox_plot)  # Додаємо vbox_plot до hbox_bottom
+        hbox_bottom.addLayout(vbox_plot)  # Add vbox_plot to hbox_bottom
 
-        # --- Текстове поле та таблиця граничних точок ---
+        # --- Text box and limit point table ---
         vbox_info = QVBoxLayout()
         vbox_info.addWidget(self.info_text)
         vbox_table2 = QVBoxLayout()
         vbox_table2.addWidget(self.border_points_table_label)
         vbox_table2.addWidget(self.border_points_table)
         vbox_info.addLayout(vbox_table2)
-        hbox_bottom.addLayout(vbox_info)  # Додаємо vbox_info до hbox_bottom
+        hbox_bottom.addLayout(vbox_info)  # Add vbox_info to hbox_bottom
 
-        vbox_main.addLayout(hbox_bottom)  # Додаємо hbox_bottom до vbox_main
+        vbox_main.addLayout(hbox_bottom)  # Add hbox_bottom to vbox_main
 
-        # --- Збільшення відступів ---
-        vbox_main.setContentsMargins(20, 20, 20, 20)  # Відступи навколо головного віджета
-        grid_top.setContentsMargins(10, 10, 10, 10)  # Відступи навколо grid_top
-        vbox_table1.setContentsMargins(10, 10, 10, 10)  # Відступи навколо таблиці точок
-        vbox_table2.setContentsMargins(10, 10, 10, 10)  # Відступи навколо таблиці граничних точок
+        # --- Increasing the margins ---
+        vbox_main.setContentsMargins(20, 20, 20, 20)  # Indents around the main widget
+        grid_top.setContentsMargins(10, 10, 10, 10)  # Indents around the grid_top
+        vbox_table1.setContentsMargins(10, 10, 10, 10)  # Indents around the point table
+        vbox_table2.setContentsMargins(10, 10, 10, 10)  # Indents around the table of boundary points
 
     def on_dimension_select(self):
-        """Обробляє вибір розмірності простору ознак."""
+        """The choice of the dimensionality of the feature space is difficult."""
         self.dimension = int(self.dimension_combobox.currentText())
-        print(f"Обрана розмірність: {self.dimension}")
+        print(f"Selected dimension: {self.dimension}")
 
-        # Очищуємо списки точок та граничних точок
+        # Clear point and boundary point lists
         self.input_vectors = []
         if hasattr(self, 'cluster_bound_point_finder'):
             self.cluster_bound_point_finder.border_points = []
 
-        # Оновлюємо кількість стовпців в обох таблицях
+        # Update the number of columns in both tables
         self.data_table.setColumnCount(self.dimension)
         self.data_table.setHorizontalHeaderLabels([f"X{i + 1}" for i in range(self.dimension)])
-        self.update_data_table()  # Оновлюємо таблицю точок
+        self.update_data_table()  # Update the point table
 
         self.border_points_table.setColumnCount(self.dimension)
         self.border_points_table.setHorizontalHeaderLabels([f"X{i + 1}" for i in range(self.dimension)])
         if hasattr(self, 'cluster_bound_point_finder'):
-            self.update_border_points_table()  # Оновлюємо таблицю граничних точок
+            self.update_border_points_table()  # Update the limit point table
 
-        # Оновлення графіка (видалення старого та створення нового)
+        # Update the schedule (delete the old one and create a new one)
         self.figure.clear()
         if self.dimension == 2:
             self.ax = self.figure.add_subplot(111)
@@ -345,13 +344,13 @@ class MainWindow(QWidget):
         self.canvas.draw()
 
     def on_file_select(self):
-        """Обробляє вибір файлу з даними."""
+        """Handles the selection of a data file."""
         options = QFileDialog.Options()
         file_name, _ = QFileDialog.getOpenFileName(
             self,
-            "Обрати файл",
+            "Select file",
             "",
-            "Data Files (*.data);;Всі файли (*)",  # Змінено розширення файлу на .data
+            "Data Files (*.data);;Всі файли (*)",
             options=options
         )
         if file_name:
@@ -359,9 +358,9 @@ class MainWindow(QWidget):
 
     def load_data_from_file(self, file_name):
         """
-        Завантажує дані з файлу.
+        Loads data from a file.
 
-        :param file_name: Шлях до файлу з даними.
+        :param file_name: Path to the file with data.
         """
         self.input_vectors = []
         with open(file_name, 'r') as f:
@@ -369,15 +368,15 @@ class MainWindow(QWidget):
                 coordinates = [float(x) for x in line.split()]
                 self.input_vectors.append(Point(coordinates))
 
-        # Проектуємо точки одразу після завантаження
+        # Project points immediately after downloading
         self.input_vectors = self.project_to_3d(self.input_vectors)
 
-        print(f"Дані завантажено з файлу: {file_name}")
-        print(f"Кількість точок: {len(self.input_vectors)}")
-        self.update_data_table()  # Оновлюємо таблицю після завантаження даних
+        print(f"Data loaded from file: {file_name}")
+        print(f"Number of points: {len(self.input_vectors)}")
+        self.update_data_table()  # Update the table after loading data
 
     def update_data_table(self):
-        """Оновлює таблицю з даними."""
+        """Updates the table with data."""
         self.data_table.setRowCount(len(self.input_vectors))
         for i, point in enumerate(self.input_vectors):
             for j, coord in enumerate(point.coordinates):
@@ -385,12 +384,12 @@ class MainWindow(QWidget):
                 self.data_table.setItem(i, j, item)
 
     def on_calculate_click(self):
-        """Обробляє натискання кнопки "Розрахувати"."""
+        """Handles pressing the ‘Calculate’ button."""
         # Проектуємо точки на 3D простір, якщо потрібно
         try:
             self.core_point_count = int(self.core_point_edit.text())
         except ValueError:
-            print("Некоректне значення Core Point Count. Використовується значення за замовчуванням (20).")
+            print("The Core Point Count value is incorrect. The default value (5) is used.")
         projected_points = self.project_to_3d(self.input_vectors)
 
         self.cluster_bound_point_finder = ClusterBoundPointFinder(
@@ -398,21 +397,21 @@ class MainWindow(QWidget):
         )
         self.cluster_bound_point_finder.calculate_bound_points()
 
-        # Визначаємо кольори для кожного кластера
+        # Define colours for each cluster
         self.cluster_colors = {}
         colors = ['red', 'blue', 'green', 'purple', 'orange', 'brown', 'pink', 'gray', 'olive', 'cyan']
         for cluster_index in range(self.cluster_bound_point_finder.n_clusters):
             self.cluster_colors[cluster_index] = colors[cluster_index]
 
         self.draw_plot(self.cluster_bound_point_finder)
-        self.update_border_points_table()  # Оновлюємо таблицю граничних точок
+        self.update_border_points_table()  # Update the limit point table
 
     def on_slider_change(self):
-        """Обробляє зміну значення повзунка відхилення."""
+        """Handles changing the value of the deviation slider."""
         self.deviation = self.slider.value() / 100
         self.deviation_label.setText(f"Deviation: {self.deviation:.2f}")
 
-        # Перераховуємо граничні точки, якщо об'єкт cluster_bound_point_finder вже існує
+        # Recalculate boundary points if the cluster_bound_point_finder object already exists
         if hasattr(self, 'cluster_bound_point_finder'):
             self.cluster_bound_point_finder.deviation = self.deviation
             self.cluster_bound_point_finder.calculate_bound_points()
@@ -420,18 +419,18 @@ class MainWindow(QWidget):
             self.update_border_points_table()  # Оновлюємо таблицю граничних точок
 
     def on_add_data_click(self):
-        """Обробляє натискання кнопки "Додати точки"."""
-        # Очищуємо списки точок та граничних точок
+        """Handles pressing the ‘Add points’ button."""
+        # Clear point and boundary point lists
         self.input_vectors = []
         if hasattr(self, 'cluster_bound_point_finder'):
             self.cluster_bound_point_finder.border_points = []
 
         text = self.input_edit.text()
-        if not text:  # Якщо текстове поле пусте, генеруємо випадкові точки
+        if not text:  # If the text field is empty, generate random points
             self.input_vectors = [
                 Point([random.uniform(0, 10) for _ in range(self.dimension)]) for _ in range(100)
             ]
-        else:  # Інакше додаємо точки з текстового поля
+        else:  # Otherwise, add points from the text box
             try:
                 point_strings = text.split(',')
                 for point_str in point_strings:
@@ -440,19 +439,19 @@ class MainWindow(QWidget):
                         self.input_vectors.append(Point(coordinates))
                     else:
                         print(
-                            f"Невірна кількість координат у точці '{point_str}'. Введіть {self.dimension} координати, розділені пробілами."
+                            f"Incorrect number of coordinates in a point '{point_str}'. Enter {self.dimension} coordinates separated by spaces."
                         )
                 self.input_edit.clear()  # Очищуємо текстове поле
             except ValueError:
-                print("Некоректний формат введення. Введіть числа, розділені пробілами та комами для розділення точок.")
+                print("The input format is incorrect. Enter numbers separated by spaces and commas to separate points.")
 
-        # Проектуємо точки одразу після додавання
+        # Project points immediately after adding them
         self.input_vectors = self.project_to_3d(self.input_vectors)
 
-        self.update_data_table()  # Оновлюємо таблицю
+        self.update_data_table()  # Update the table
 
     def update_border_points_table(self):
-        """Оновлює таблицю з граничними точками."""
+        """Updates the table with boundary points."""
         border_points = []
         for cluster_index in range(len(self.cluster_bound_point_finder.border_points)):
             border_points.extend(list(self.cluster_bound_point_finder.border_points[cluster_index].keys()))
@@ -465,34 +464,34 @@ class MainWindow(QWidget):
 
     def project_to_3d(self, points: List[Point]) -> List[Point]:
         """
-        Проектує список точок на 3D простір за допомогою PCA.
+        Projects a list of points onto a 3D space using PCA.
 
-        :param points: Список точок для проекції.
-        :return: Список точок, спроектованих на 3D простір.
+        :param points: A list of points to project.
+        :return: A list of points projected onto the 3D space.
         """
         if len(points[0].get_coordinates()) <= 3:
-            return points  # Немає необхідності в проекції, якщо розмірність <= 3
+            return points  # No need for projection if dimension <= 3
 
-        # Створюємо масив NumPy з координат точок
+        # Create a NumPy array from the coordinates of the points
         data = np.array([[p.coordinates[i] for i in range(self.dimension)] for p in points])
 
-        # Створюємо та навчаємо PCA з 3 компонентами
+        # We create and train PCAs with 3 components
         pca = PCA(n_components=3)
         pca.fit(data)
 
-        # Трансформуємо дані та повертаємо список точок
+        # Transform data and return a list of points
         transformed_data = pca.transform(data)
         return [Point(list(row)) for row in transformed_data]
 
 
     def draw_plot(self, cluster_bound_point_finder):
-        """Малює графік з точками та граничними точками."""
-        self.ax.cla()  # Очищення графіка
+        """Draws a graph with points and boundary points."""
+        self.ax.cla()  # Clearing the schedule
 
-        # Проектуємо точки на 3D простір
+        # Project points onto 3D space
         projected_points = self.project_to_3d(cluster_bound_point_finder.input_vectors)
 
-        # Малюємо всі точки сірим кольором
+        # Draw all points in grey
         if cluster_bound_point_finder.coordinates_count == 2:
             self.ax.scatter(
                 [p.coordinates[0] for p in projected_points],
@@ -510,29 +509,29 @@ class MainWindow(QWidget):
         info_string = ""
         for cluster_index in range(len(cluster_bound_point_finder.cluster_centers)):
             center = cluster_bound_point_finder.cluster_centers[cluster_index]
-            result = cluster_bound_point_finder.border_points[cluster_index]  # Беремо вже обчислені граничні точки
+            result = cluster_bound_point_finder.border_points[cluster_index]  # Take the already calculated boundary points
             cluster_color = self.cluster_colors[cluster_index]
-            info_string += f"Кластер {cluster_index} ({cluster_color}): {len(result)} граничних точок\n"
+            info_string += f"Cluster {cluster_index} ({cluster_color}): {len(result)} boundary points\n"
 
             if cluster_bound_point_finder.coordinates_count == 2:
-                # Малюємо граничні точки для поточного кластера
+                # Drawing boundary points for the current cluster
                 self.ax.scatter([p.coordinates[0] for p in result],
                                 [p.coordinates[1] for p in result],
                                 s=100, c=cluster_color)
-                # Малюємо центр кластера
+                # Draw the centre of the cluster
                 self.ax.scatter(center.coordinates[0], center.coordinates[1], s=150, c='black', marker='X')
-                # Додаємо текст з номером кластера
+                # Add text with the cluster number
                 self.ax.text(center.coordinates[0], center.coordinates[1], str(cluster_index), fontsize=14, color='red')
             else:
-                # Малюємо граничні точки для поточного кластера
+                # Drawing boundary points for the current cluster
                 self.ax.scatter([p.coordinates[0] for p in result],
                                 [p.coordinates[1] for p in result],
                                 [p.coordinates[2] for p in result],
                                 s=100, c=cluster_color)
-                # Малюємо центр кластера
+                # Draw the centre of the cluster
                 self.ax.scatter(center.coordinates[0], center.coordinates[1], center.coordinates[2], s=150,
                                 c='black', marker='X')
-                # Додаємо текст з номером кластера
+                # Add text with the cluster number
                 self.ax.text(center.coordinates[0], center.coordinates[1], center.coordinates[2], str(cluster_index),
                             fontsize=12, color='red')
 
